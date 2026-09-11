@@ -99,6 +99,9 @@ main{padding-top:22px;}
 .spark-line{fill:none;stroke:currentColor;stroke-width:1.8;}
 .spark-dot{fill:currentColor;}
 .spark-up{color:var(--up);} .spark-down{color:var(--down);}
+.detail-chart{width:100%;height:130px;display:block;margin-top:8px;}
+.chart-axis{stroke:var(--border);stroke-width:1;}
+.chart-label{font-family:'JetBrains Mono',monospace;font-size:8.5px;fill:var(--muted);}
 
 .home-columns{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
 @media (max-width:760px){.home-columns{grid-template-columns:1fr;}}
@@ -213,14 +216,13 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:4px 0;}
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script>
-// TODO: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)에서 복사한 값으로 아래를 채워주세요.
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCMi5zDALtTB3n5qlo2eLymZid2FnngQS8",
+  authDomain: "gamsam-stock-exchange.firebaseapp.com",
+  projectId: "gamsam-stock-exchange",
+  storageBucket: "gamsam-stock-exchange.firebasestorage.app",
+  messagingSenderId: "244082743397",
+  appId: "1:244082743397:web:60bba97c53f7392568ce8c"
 };
 
 const ICONS = {
@@ -263,6 +265,7 @@ let ui = {
   buyReceipt:null, sellReceipt:null,
   openInfo:null,
   rankSort:'assets',
+  chartRange:'1w',
   adminUnlocked: sessionStorage.getItem('adminUnlocked')==='1'
 };
 
@@ -294,6 +297,43 @@ function sparkline(prices){
     <polygon points="${area}" class="spark-fill"/>
     <polyline points="${line}" class="spark-line"/>
     <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.4" class="spark-dot"/>
+  </svg>`;
+}
+
+function priceSeries(key, days){
+  const hist = S.market.history||[];
+  const slice = hist.slice(-days).map(e=>({ date:e.date, price:e[key+'Price'] }));
+  const today = todayStr();
+  if(!slice.length || slice[slice.length-1].date !== today){
+    slice.push({ date: today, price: S.market.stocks[key].price });
+  }
+  return slice;
+}
+
+function detailChart(points){
+  if(!points.length) return `<div class="empty">데이터가 없어요.</div>`;
+  const pts = points.length===1 ? [points[0], points[0]] : points;
+  const W=320, H=130, padL=40, padR=10, padT=16, padB=20;
+  const prices = pts.map(p=>p.price);
+  const min=Math.min(...prices), max=Math.max(...prices);
+  const range = (max-min) || Math.max(min*0.01, 0.001);
+  const x = i => padL + (pts.length===1?0:i/(pts.length-1))*(W-padL-padR);
+  const y = p => padT + (1-(p-min)/range)*(H-padT-padB);
+  const line = pts.map((p,i)=>`${x(i).toFixed(1)},${y(p.price).toFixed(1)}`).join(' ');
+  const area = `${x(0).toFixed(1)},${(H-padB).toFixed(1)} ${line} ${x(pts.length-1).toFixed(1)},${(H-padB).toFixed(1)}`;
+  const up = pts[pts.length-1].price >= pts[0].price;
+  const cls = up ? 'spark-up' : 'spark-down';
+  const lastX = x(pts.length-1), lastY = y(pts[pts.length-1].price);
+  const fmtDate = d => d.slice(5).replace('-','/');
+  return `<svg viewBox="0 0 ${W} ${H}" class="detail-chart ${cls}" preserveAspectRatio="none">
+    <line x1="${padL}" y1="${(H-padB).toFixed(1)}" x2="${W-padR}" y2="${(H-padB).toFixed(1)}" class="chart-axis"/>
+    <polygon points="${area}" class="spark-fill"/>
+    <polyline points="${line}" class="spark-line"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" class="spark-dot"/>
+    <text x="${padL}" y="${(padT-4).toFixed(1)}" class="chart-label">${fmtMoney(max)}</text>
+    <text x="${padL}" y="${(H-padB+13).toFixed(1)}" class="chart-label">${fmtMoney(min)}</text>
+    <text x="${padL}" y="${H-4}" class="chart-label" text-anchor="start">${fmtDate(pts[0].date)}</text>
+    <text x="${W-padR}" y="${H-4}" class="chart-label" text-anchor="end">${fmtDate(pts[pts.length-1].date)}</text>
   </svg>`;
 }
 
@@ -409,6 +449,11 @@ function renderHome(){
       <div class="stock-info" ${open?'':'hidden'}>
         <p>${STOCK_INFO[k]}</p>
         ${st.newsToday ? `<div class="news-line">📰 <b>${st.newsDate||''}</b>${st.newsToday}</div>` : `<div class="news-line muted">아직 등록된 오늘의 뉴스가 없어요.</div>`}
+        <div class="sort-row" style="margin-top:12px">
+          <button class="btn ${ui.chartRange==='1w'?'active':''}" data-action="chart-range" data-range="1w">최근 1주</button>
+          <button class="btn ${ui.chartRange==='1m'?'active':''}" data-action="chart-range" data-range="1m">최근 1개월</button>
+        </div>
+        ${detailChart(priceSeries(k, ui.chartRange==='1w'?7:30))}
       </div>
     </div>`;
   }).join('');
@@ -735,6 +780,7 @@ document.addEventListener('click', async e=>{
   const action = t.dataset.action;
 
   if(action==='toggle-info'){ ui.openInfo = ui.openInfo===t.dataset.stock ? null : t.dataset.stock; renderHome(); }
+  if(action==='chart-range'){ ui.chartRange = t.dataset.range; renderHome(); }
   if(action==='pick-buy-stock'){ ui.buyStock=t.dataset.stock; ui.buyReceipt=null; renderBuy(); }
   if(action==='pick-sell-stock'){ ui.sellStock=t.dataset.stock; ui.sellReceipt=null; renderSell(); }
 
