@@ -314,7 +314,7 @@ function priceSeries(key, days){
 function detailChart(points){
   if(!points.length) return `<div class="empty">데이터가 없어요.</div>`;
   const pts = points.length===1 ? [points[0], points[0]] : points;
-  const W=320, H=130, padL=40, padR=10, padT=16, padB=20;
+  const W=280, H=100, padL=38, padR=8, padT=12, padB=10;
   const prices = pts.map(p=>p.price);
   const min=Math.min(...prices), max=Math.max(...prices);
   const range = (max-min) || Math.max(min*0.01, 0.001);
@@ -325,16 +325,14 @@ function detailChart(points){
   const up = pts[pts.length-1].price >= pts[0].price;
   const cls = up ? 'spark-up' : 'spark-down';
   const lastX = x(pts.length-1), lastY = y(pts[pts.length-1].price);
-  const fmtDate = d => d.slice(5).replace('-','/');
   return `<svg viewBox="0 0 ${W} ${H}" class="detail-chart ${cls}" preserveAspectRatio="none">
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${(H-padB).toFixed(1)}" class="chart-axis"/>
     <line x1="${padL}" y1="${(H-padB).toFixed(1)}" x2="${W-padR}" y2="${(H-padB).toFixed(1)}" class="chart-axis"/>
     <polygon points="${area}" class="spark-fill"/>
     <polyline points="${line}" class="spark-line"/>
-    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" class="spark-dot"/>
-    <text x="${padL}" y="${(padT-4).toFixed(1)}" class="chart-label">${fmtMoney(max)}</text>
-    <text x="${padL}" y="${(H-padB+13).toFixed(1)}" class="chart-label">${fmtMoney(min)}</text>
-    <text x="${padL}" y="${H-4}" class="chart-label" text-anchor="start">${fmtDate(pts[0].date)}</text>
-    <text x="${W-padR}" y="${H-4}" class="chart-label" text-anchor="end">${fmtDate(pts[pts.length-1].date)}</text>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.6" class="spark-dot"/>
+    <text x="${(padL-4).toFixed(1)}" y="${(padT+3).toFixed(1)}" class="chart-label" text-anchor="end">${fmtMoney(max)}</text>
+    <text x="${(padL-4).toFixed(1)}" y="${(H-padB).toFixed(1)}" class="chart-label" text-anchor="end">${fmtMoney(min)}</text>
   </svg>`;
 }
 
@@ -435,8 +433,6 @@ function renderHome(){
     const chg = st.prevClose ? (st.price-st.prevClose)/st.prevClose*100 : 0;
     const cls = pctClass(chg);
     const arrow = cls==='up'?'▲':(cls==='down'?'▼':'－');
-    const hist = (S.market.history||[]).slice(-20).map(h=>h[k+'Price']);
-    hist.push(st.price);
     const open = ui.openInfo===k;
     return `<div class="stock-card">
       <div class="stock-head">
@@ -446,15 +442,10 @@ function renderHome(){
       </div>
       <div class="stock-price num">${fmtPrice(st.price)}</div>
       <div class="stock-chg ${cls} num">${arrow} ${fmtPct(chg)}</div>
-      ${sparkline(hist)}
+      ${detailChart(priceSeries(k, ui.chartRange==='1w'?7:30))}
       <div class="stock-info" ${open?'':'hidden'}>
         <p>${STOCK_INFO[k]}</p>
         ${st.newsToday ? `<div class="news-line">📰 <b>${st.newsDate||''}</b>${st.newsToday}</div>` : `<div class="news-line muted">아직 등록된 오늘의 뉴스가 없어요.</div>`}
-        <div class="sort-row" style="margin-top:12px">
-          <button class="btn ${ui.chartRange==='1w'?'active':''}" data-action="chart-range" data-range="1w">최근 1주</button>
-          <button class="btn ${ui.chartRange==='1m'?'active':''}" data-action="chart-range" data-range="1m">최근 1개월</button>
-        </div>
-        ${detailChart(priceSeries(k, ui.chartRange==='1w'?7:30))}
       </div>
     </div>`;
   }).join('');
@@ -474,6 +465,10 @@ function renderHome(){
 
   el.innerHTML = `
     ${!S.market.started?`<div class="banner">🔔 거래소가 아직 개장 전입니다. <b>관리자</b> 탭에서 게임을 시작하면 매수·매도가 가능해요.</div>`:''}
+    <div class="sort-row">
+      <button class="btn ${ui.chartRange==='1w'?'active':''}" data-action="chart-range" data-range="1w">최근 1주 차트</button>
+      <button class="btn ${ui.chartRange==='1m'?'active':''}" data-action="chart-range" data-range="1m">최근 1개월 차트</button>
+    </div>
     <div class="market-grid">${cards}</div>
     <div class="home-columns">
       <div class="card"><h2>최근 체결 내역</h2>${tradesHtml}</div>
