@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>감삼당 증권거래소</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F5F2EA; --surface:#FFFFFF; --surface-2:#EFEADD; --ink:#211D16; --muted:#786E5C;
+  --border:#E2DAC7; --accent:#B9862E; --accent-ink:#FFFFFF; --accent-soft:#F1E3C6;
+  --up:#C7443B; --down:#2F63BE; --flat:#8A8072;
+  --hynix:#96683A; --hynix-soft:#EFE1CE; --alphabet:#3C7A63; --alphabet-soft:#DCEBE3;
+  --sp500:#725B8C; --sp500-soft:#E8E1EE;
+  --shadow:0 1px 2px rgba(33,29,22,.06),0 6px 20px -8px rgba(33,29,22,.18);
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#18160F; --surface:#221E16; --surface-2:#2A251A; --ink:#F1EAD8; --muted:#A99C82;
+    --border:#3C3423; --accent:#E2AC4C; --accent-ink:#1A1710; --accent-soft:#3A2E17;
+    --up:#E97C72; --down:#7DA0EA; --flat:#948A72;
+    --hynix:#CC9A61; --hynix-soft:#3A2E1C; --alphabet:#6FBBA0; --alphabet-soft:#1E332B;
+    --sp500:#B49BD1; --sp500-soft:#2C2536;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px -10px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#18160F; --surface:#221E16; --surface-2:#2A251A; --ink:#F1EAD8; --muted:#A99C82;
+  --border:#3C3423; --accent:#E2AC4C; --accent-ink:#1A1710; --accent-soft:#3A2E17;
+  --up:#E97C72; --down:#7DA0EA; --flat:#948A72;
+  --hynix:#CC9A61; --hynix-soft:#3A2E1C; --alphabet:#6FBBA0; --alphabet-soft:#1E332B;
+  --sp500:#B49BD1; --sp500-soft:#2C2536;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px -10px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Gowun Dodum',sans-serif;line-height:1.5;}
+h1,h2,h3,.disp{font-family:'Gowun Batang',serif;text-wrap:balance;}
+.num{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 64px;}
+a{color:inherit;}
+
+/* ticker marquee */
+.ticker{background:var(--ink);color:var(--bg);overflow:hidden;white-space:nowrap;position:relative;border-bottom:1px solid var(--border);}
+.ticker-track{display:inline-flex;gap:48px;padding:8px 0;animation:tickerscroll 26s linear infinite;}
+.ticker span.tk-up{color:var(--up);} .ticker span.tk-down{color:var(--down);}
+.ticker .tk-item{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.02em;}
+@keyframes tickerscroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+@media (prefers-reduced-motion: reduce){.ticker-track{animation:none;}}
+
+/* header */
+header.top{padding:28px 20px 8px;max-width:1080px;margin:0 auto;}
+.top-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.brand h1{font-size:clamp(24px,4vw,32px);margin:0 0 2px;}
+.brand p{margin:0;color:var(--muted);font-size:14px;}
+.status-cluster{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--flat);display:inline-block;}
+.dot.live{background:var(--alphabet);box-shadow:0 0 0 0 rgba(111,187,160,.6);animation:pulse 2s infinite;}
+@media (prefers-reduced-motion: reduce){.dot.live{animation:none;}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(111,187,160,.45);}70%{box-shadow:0 0 0 7px rgba(111,187,160,0);}100%{box-shadow:0 0 0 0 rgba(111,187,160,0);}}
+.chip{padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:12px;}
+.chip.open{border-color:var(--alphabet);color:var(--alphabet);}
+.chip.closed{border-color:var(--muted);color:var(--muted);}
+
+/* tabs */
+nav.tabs{max-width:1080px;margin:18px auto 0;padding:0 20px;display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--border);}
+.tab-btn{font-family:'Gowun Batang',serif;font-size:15px;background:none;border:none;padding:10px 16px;cursor:pointer;color:var(--muted);position:relative;white-space:nowrap;}
+.tab-btn:hover{color:var(--ink);}
+.tab-btn.active{color:var(--ink);font-weight:700;}
+.tab-btn.active::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px;}
+.tab-btn:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+main{padding-top:22px;}
+.panel{display:flex;flex-direction:column;gap:22px;}
+
+/* market cards */
+.market-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
+.stock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+.stock-head{display:flex;align-items:center;gap:10px;}
+.info-btn{margin-left:auto;width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);font-family:'Gowun Batang',serif;font-size:13px;cursor:pointer;flex-shrink:0;line-height:1;}
+.info-btn:hover{border-color:var(--accent);color:var(--accent);}
+.stock-info{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:13px;color:var(--muted);}
+.stock-info p{margin:0 0 8px;}
+.news-line{font-size:12.5px;color:var(--ink);background:var(--surface-2);border-radius:8px;padding:8px 10px;}
+.news-line.muted{color:var(--muted);}
+.news-line b{font-family:'JetBrains Mono',monospace;font-weight:600;margin-right:4px;}
+.stock-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+.stock-icon svg{width:100%;height:100%;display:block;}
+.stock-name{font-family:'Gowun Batang',serif;font-weight:700;font-size:15px;}
+.stock-sub{font-size:11px;color:var(--muted);}
+.stock-price{font-size:26px;font-weight:600;margin-top:10px;}
+.stock-chg{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-top:2px;padding:2px 8px;border-radius:999px;}
+.stock-chg.up{color:var(--up);background:color-mix(in srgb, var(--up) 14%, transparent);}
+.stock-chg.down{color:var(--down);background:color-mix(in srgb, var(--down) 14%, transparent);}
+.stock-chg.flat{color:var(--flat);background:color-mix(in srgb, var(--flat) 14%, transparent);}
+.spark{width:100%;height:38px;margin-top:10px;display:block;}
+.spark-fill{fill:currentColor;opacity:.12;}
+.spark-line{fill:none;stroke:currentColor;stroke-width:1.8;}
+.spark-dot{fill:currentColor;}
+.spark-up{color:var(--up);} .spark-down{color:var(--down);}
+
+.home-columns{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
+@media (max-width:760px){.home-columns{grid-template-columns:1fr;}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+.card h2{font-size:16px;margin:0 0 12px;}
+.card h3{font-size:14px;margin:0 0 10px;}
+.trade-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px;gap:8px;}
+.trade-row:last-child{border-bottom:none;}
+.trade-tag{font-size:11px;padding:1px 7px;border-radius:6px;font-weight:600;}
+.trade-tag.buy{background:color-mix(in srgb, var(--up) 16%, transparent);color:var(--up);}
+.trade-tag.sell{background:color-mix(in srgb, var(--down) 16%, transparent);color:var(--down);}
+.muted{color:var(--muted);}
+.empty{color:var(--muted);font-size:13px;padding:12px 0;text-align:center;}
+
+.rank-mini-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13px;}
+.rank-mini-row:last-child{border-bottom:none;}
+.medal{width:22px;text-align:center;}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-size:13px;color:var(--muted);}
+select,.input{font-family:'JetBrains Mono',monospace;font-size:15px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);width:100%;}
+select{font-family:'Gowun Dodum',sans-serif;}
+.input:focus,select:focus{border-color:var(--accent);}
+.quick-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+.btn{font-family:'Gowun Dodum',sans-serif;border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:9px 14px;border-radius:10px;cursor:pointer;font-size:13px;transition:transform .08s ease;}
+.btn:hover{border-color:var(--accent);}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;font-size:15px;padding:12px 18px;width:100%;}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-danger{border-color:var(--up);color:var(--up);}
+
+.stock-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.pick-card{border:1.5px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;background:var(--surface);text-align:left;}
+.pick-card.selected{border-color:var(--accent);background:var(--accent-soft);}
+.pick-card .pc-price{font-size:15px;margin-top:4px;}
+.pick-card .pc-pnl{font-size:12px;margin-top:4px;}
+
+.receipt{border:1.5px dashed var(--accent);border-radius:12px;padding:18px;background:var(--accent-soft);}
+.receipt h3{font-family:'Gowun Batang',serif;font-size:17px;margin:0 0 12px;}
+.receipt-row{display:flex;justify-content:space-between;padding:5px 0;font-size:14px;border-bottom:1px dotted color-mix(in srgb, var(--accent) 50%, transparent);}
+.receipt-row:last-child{border-bottom:none;}
+.receipt-row b{font-family:'JetBrains Mono',monospace;}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font-weight:600;font-size:12px;}
+.tbl-wrap{overflow-x:auto;}
+.up-text{color:var(--up);} .down-text{color:var(--down);} .flat-text{color:var(--flat);}
+
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.stat{background:var(--surface-2);border-radius:12px;padding:14px;}
+.stat .label{font-size:12px;color:var(--muted);}
+.stat .value{font-size:22px;margin-top:4px;}
+
+.lock{padding:40px 20px;text-align:center;color:var(--muted);}
+.lock .disp{font-size:18px;color:var(--ink);margin-bottom:6px;}
+
+.banner{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--muted);}
+
+.pin-row{display:flex;gap:8px;max-width:280px;}
+.pin-row .input{flex:1;letter-spacing:.3em;text-align:center;}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+.toast.err{background:var(--up);}
+
+.danger-zone{border:1px solid var(--up);border-radius:12px;padding:16px;}
+.danger-zone h3{color:var(--up);}
+hr.sep{border:none;border-top:1px solid var(--border);margin:4px 0;}
+.sort-row{display:flex;gap:6px;margin-bottom:10px;}
+.sort-row .btn.active{border-color:var(--accent);background:var(--accent-soft);}
+</style>
+</head>
+<body>
+
+<div class="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
+
+<header class="top">
+  <div class="top-row">
+    <div class="brand">
+      <h1>감삼당 증권거래소</h1>
+      <p>국가운영제 모의투자 · <span id="todayLabel"></span></p>
+    </div>
+    <div class="status-cluster">
+      <span id="gameChip" class="chip closed">개장 전</span>
+      <span><span class="dot" id="liveDot"></span> <span id="liveLabel">연결 중…</span></span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab-btn active" data-tab="home">홈</button>
+  <button class="tab-btn" data-tab="buy">매수</button>
+  <button class="tab-btn" data-tab="sell">매도</button>
+  <button class="tab-btn" data-tab="account">내 계좌</button>
+  <button class="tab-btn" data-tab="ranking">랭킹</button>
+  <button class="tab-btn" data-tab="admin">관리자</button>
+</nav>
+
+<main class="wrap">
+  <section class="panel" id="tab-home" data-panel="home"></section>
+  <section class="panel" id="tab-buy" data-panel="buy" hidden></section>
+  <section class="panel" id="tab-sell" data-panel="sell" hidden></section>
+  <section class="panel" id="tab-account" data-panel="account" hidden></section>
+  <section class="panel" id="tab-ranking" data-panel="ranking" hidden></section>
+  <section class="panel" id="tab-admin" data-panel="admin" hidden></section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script>
+// TODO: Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)에서 복사한 값으로 아래를 채워주세요.
+const FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const ICONS = {
+  hynix: `<svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+    <rect width="34" height="34" rx="9" fill="#E4002B"/>
+    <text x="17" y="21.5" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="14" fill="#ffffff" text-anchor="middle">SK</text>
+  </svg>`,
+  alphabet: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="12" fill="#ffffff"/>
+    <path fill="#4285F4" d="M43.6 24.5c0-1.6-.14-3.13-.4-4.6H24v8.7h11c-.47 2.6-1.9 4.8-4.06 6.28v5.2h6.56c3.84-3.54 6.1-8.76 6.1-14.98z"/>
+    <path fill="#34A853" d="M24 44c5.5 0 10.1-1.82 13.5-4.92l-6.56-5.2c-1.82 1.22-4.16 1.95-6.94 1.95-5.33 0-9.85-3.6-11.46-8.44H5.8v5.36C9.2 39.4 16.02 44 24 44z"/>
+    <path fill="#FBBC05" d="M12.54 27.4a11.9 11.9 0 0 1 0-6.8v-5.36H5.8a20 20 0 0 0 0 18.02l6.74-5.86z"/>
+    <path fill="#EA4335" d="M24 12.36c3 0 5.7 1.03 7.82 3.05l5.87-5.87C34.1 6.3 29.5 4 24 4 16.02 4 9.2 8.6 5.8 15.24l6.74 5.86c1.6-4.84 6.13-8.44 11.46-8.44z"/>
+  </svg>`,
+  sp500: `<svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+    <rect width="34" height="34" rx="9" fill="#1D2B4F"/>
+    <text x="17" y="15.5" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="9.5" fill="#ffffff" text-anchor="middle">S&amp;P</text>
+    <text x="17" y="26" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="9.5" fill="#F2B441" text-anchor="middle">500</text>
+  </svg>`
+};
+const STOCK_META = {
+  hynix:    { name:'SK하이닉스', sub:'반도체 · 메모리', color:'var(--hynix)', soft:'var(--hynix-soft)' },
+  alphabet: { name:'알파벳',     sub:'글로벌 테크',     color:'var(--alphabet)', soft:'var(--alphabet-soft)' },
+  sp500:    { name:'S&P500',    sub:'미국 대표지수',   color:'var(--sp500)', soft:'var(--sp500-soft)' }
+};
+const STOCK_KEYS = ['hynix','alphabet','sp500'];
+const STOCK_INFO = {
+  hynix: 'SK하이닉스는 D램·낸드플래시 같은 메모리 반도체를 만드는 우리나라 대표 반도체 기업이에요. 스마트폰, 컴퓨터, AI 서버에 들어가는 핵심 부품을 만들고, 국내 코스피 시장에 상장되어 있어요.',
+  alphabet: '알파벳은 구글 검색·유튜브·안드로이드·인공지능(제미나이) 등을 서비스하는 미국의 글로벌 테크 기업이에요. 미국 나스닥 시장에 상장되어 있고, 티커는 GOOGL이에요.',
+  sp500: 'S&P500은 애플·마이크로소프트·아마존 등 미국을 대표하는 500개 대기업의 주가를 모아 만든 지수예요. 한 회사가 아니라 미국 경제 전체의 흐름을 보여주는 지표예요.'
+};
+let db = null;
+let S = { market:null, students:[], recentTrades:[], adminConfig:null, ready:false };
+let currentTab = 'home';
+let ui = {
+  buyStudent:null, buyStock:null,
+  sellStudent:null, sellStock:null,
+  acctStudent:null,
+  acctTrades:[],
+  buyReceipt:null, sellReceipt:null,
+  openInfo:null,
+  rankSort:'assets',
+  adminUnlocked: sessionStorage.getItem('adminUnlocked')==='1'
+};
+
+function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
+function fmtMoney(n){ const v=round2(n||0); const s=v<0?'-':''; return s+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtPct(n){ if(!isFinite(n)) n=0; const s=n>0?'+':''; return s+n.toFixed(2)+'%'; }
+function fmtPrice(n){ return fmtMoney(n); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function pctClass(n){ return n>0.0001?'up':(n<-0.0001?'down':'flat'); }
+
+function toast(msg, isErr){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(isErr?' err':'');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+function sparkline(prices){
+  if(!prices || prices.length<2){
+    return '<svg viewBox="0 0 120 40" class="spark flat"><line x1="2" y1="20" x2="118" y2="20" stroke="currentColor" stroke-opacity=".25"/></svg>';
+  }
+  const min=Math.min(...prices), max=Math.max(...prices), range=(max-min)||1;
+  const pts = prices.map((p,i)=>[ i/(prices.length-1)*118+1, 38-((p-min)/range)*34-2 ]);
+  const lastUp = prices[prices.length-1] >= prices[prices.length-2];
+  const line = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const area = `1,39 ${line} 119,39`;
+  const cls = lastUp?'spark-up':'spark-down';
+  const last = pts[pts.length-1];
+  return `<svg viewBox="0 0 120 40" class="spark ${cls}" preserveAspectRatio="none">
+    <polygon points="${area}" class="spark-fill"/>
+    <polyline points="${line}" class="spark-line"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.4" class="spark-dot"/>
+  </svg>`;
+}
+
+function holdingValue(h, price){ return (h?.units||0)*price; }
+function studentAssets(stu){
+  let v = 0;
+  if(S.market) STOCK_KEYS.forEach(k=> v += holdingValue(stu.holdings?.[k], S.market.stocks[k].price));
+  return v;
+}
+function studentReturnPct(stu, assets){
+  const bought = stu.totalBought||0, sold = stu.totalSold||0;
+  return bought>0 ? (assets + sold - bought)/bought*100 : 0;
+}
+
+/* ---------- DB INIT ---------- */
+async function initDb(){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+  }catch(e){ console.error(e); db=null; }
+
+  if(!db){
+    document.getElementById('liveLabel').textContent='데이터 연결 불가';
+    document.getElementById('liveDot').classList.remove('live');
+    renderAll();
+    return;
+  }
+  document.getElementById('liveDot').classList.add('live');
+  document.getElementById('liveLabel').textContent='실시간 연동중';
+
+  db.doc('market/state').onSnapshot(snap=>{
+    S.market = snap.exists ? snap.data() : null;
+    S.ready = true;
+    renderAll();
+  }, err=>{ console.error(err); toast('시세 데이터를 불러오지 못했어요.', true); });
+
+  db.doc('config/admin').onSnapshot(snap=>{
+    S.adminConfig = snap.exists ? snap.data() : { pin:'1234' };
+    renderAdmin();
+  });
+
+  db.collection('students').onSnapshot(snap=>{
+    S.students = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>a.id.localeCompare(b.id));
+    renderAll();
+  }, err=>{ console.error(err); });
+
+  db.collection('trades').orderBy('ts','desc').limit(20).onSnapshot(snap=>{
+    S.recentTrades = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderHome();
+  }, err=>{ console.error(err); });
+}
+
+/* ---------- TAB SWITCHING ---------- */
+document.getElementById('tabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.tab-btn'); if(!btn) return;
+  currentTab = btn.dataset.tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+  document.querySelectorAll('[data-panel]').forEach(p=>p.hidden = p.dataset.panel!==currentTab);
+  renderAll();
+});
+
+function renderAll(){
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  const chip = document.getElementById('gameChip');
+  if(S.market?.started){ chip.textContent='거래중'; chip.className='chip open'; }
+  else { chip.textContent='개장 전'; chip.className='chip closed'; }
+  renderTicker();
+  renderHome();
+  renderBuy();
+  renderSell();
+  renderAccount();
+  renderRanking();
+  renderAdmin();
+}
+
+function renderTicker(){
+  const track = document.getElementById('tickerTrack');
+  if(!S.market){ track.innerHTML=''; return; }
+  const items = STOCK_KEYS.map(k=>{
+    const st=S.market.stocks[k], meta=STOCK_META[k];
+    const chg = st.prevClose ? (st.price-st.prevClose)/st.prevClose*100 : 0;
+    const cls = pctClass(chg)==='up'?'tk-up':(pctClass(chg)==='down'?'tk-down':'');
+    const arrow = pctClass(chg)==='up'?'▲':(pctClass(chg)==='down'?'▼':'－');
+    return `<span class="tk-item">${meta.name} <b class="num">${fmtPrice(st.price)}</b> <span class="${cls}">${arrow} ${fmtPct(chg)}</span></span>`;
+  });
+  track.innerHTML = items.concat(items).join('<span class="tk-item">·</span>');
+}
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  const el = document.getElementById('tab-home');
+  if(!S.market){
+    el.innerHTML = `<div class="lock"><div class="disp">시세 정보를 불러오는 중입니다…</div></div>`;
+    return;
+  }
+  const cards = STOCK_KEYS.map(k=>{
+    const st=S.market.stocks[k], meta=STOCK_META[k];
+    const chg = st.prevClose ? (st.price-st.prevClose)/st.prevClose*100 : 0;
+    const cls = pctClass(chg);
+    const arrow = cls==='up'?'▲':(cls==='down'?'▼':'－');
+    const hist = (S.market.history||[]).slice(-20).map(h=>h[k+'Price']);
+    hist.push(st.price);
+    const open = ui.openInfo===k;
+    return `<div class="stock-card">
+      <div class="stock-head">
+        <div class="stock-icon">${ICONS[k]}</div>
+        <div><div class="stock-name">${meta.name}</div><div class="stock-sub">${meta.sub}</div></div>
+        <button class="info-btn" data-action="toggle-info" data-stock="${k}" aria-label="${meta.name} 설명 보기" title="종목 설명 · 오늘의 뉴스">ⓘ</button>
+      </div>
+      <div class="stock-price num">${fmtPrice(st.price)}</div>
+      <div class="stock-chg ${cls} num">${arrow} ${fmtPct(chg)}</div>
+      ${sparkline(hist)}
+      <div class="stock-info" ${open?'':'hidden'}>
+        <p>${STOCK_INFO[k]}</p>
+        ${st.newsToday ? `<div class="news-line">📰 <b>${st.newsDate||''}</b>${st.newsToday}</div>` : `<div class="news-line muted">아직 등록된 오늘의 뉴스가 없어요.</div>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  const tradeLabel = {buy:'매수', sell:'매도'};
+  const tradesHtml = S.recentTrades.length ? S.recentTrades.slice(0,8).map(t=>`
+    <div class="trade-row">
+      <span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.studentName}${t.stockKey?` · ${STOCK_META[t.stockKey]?.name||t.stockKey}`:''}</span>
+      <span class="num">${fmtMoney(t.amount)}</span>
+    </div>`).join('') : `<div class="empty">아직 체결 내역이 없어요.</div>`;
+
+  const ranked = [...S.students].sort((a,b)=>studentAssets(b)-studentAssets(a)).slice(0,5);
+  const medals=['🥇','🥈','🥉'];
+  const rankHtml = ranked.length ? ranked.map((s,i)=>`
+    <div class="rank-mini-row"><span class="medal">${medals[i]||(i+1)}</span> <span style="flex:1">${s.name}</span> <span class="num">${fmtMoney(studentAssets(s))}</span></div>
+  `).join('') : `<div class="empty">등록된 학생이 없어요.</div>`;
+
+  el.innerHTML = `
+    ${!S.market.started?`<div class="banner">🔔 거래소가 아직 개장 전입니다. <b>관리자</b> 탭에서 게임을 시작하면 매수·매도가 가능해요.</div>`:''}
+    <div class="market-grid">${cards}</div>
+    <div class="home-columns">
+      <div class="card"><h2>최근 체결 내역</h2>${tradesHtml}</div>
+      <div class="card"><h2>평가금액 TOP 5</h2>${rankHtml}</div>
+    </div>
+  `;
+}
+
+/* ---------- BUY ---------- */
+function studentOptions(selectedId){
+  return `<option value="">학생을 선택하세요</option>` + S.students.map(s=>
+    `<option value="${s.id}" ${s.id===selectedId?'selected':''}>${s.name}</option>`).join('');
+}
+
+function renderBuy(){
+  const el = document.getElementById('tab-buy');
+  if(!S.market?.started){
+    el.innerHTML = `<div class="lock"><div class="disp">거래소 개장 전입니다</div>관리자가 게임을 시작하면 매수할 수 있어요.</div>`;
+    return;
+  }
+  const stu = S.students.find(s=>s.id===ui.buyStudent);
+  const stockKey = ui.buyStock;
+  const price = stockKey ? S.market.stocks[stockKey].price : 0;
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>1. 매수할 학생</h2>
+      <div class="field"><select id="buyStudentSel">${studentOptions(ui.buyStudent)}</select></div>
+    </div>
+    ${stu ? `
+    <div class="card">
+      <h2>2. 종목 선택</h2>
+      <div class="stock-picker">
+        ${STOCK_KEYS.map(k=>{
+          const st=S.market.stocks[k], meta=STOCK_META[k];
+          return `<button class="pick-card ${k===stockKey?'selected':''}" data-action="pick-buy-stock" data-stock="${k}">
+            <div class="stock-name" style="color:${meta.color}">${meta.name}</div>
+            <div class="pc-price num">${fmtPrice(st.price)}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+    ${stu && stockKey ? `
+    <div class="card">
+      <h2>3. 매수 금액 ($)</h2>
+      <div class="field"><input type="number" id="buyAmount" class="input" min="0.5" step="0.5" placeholder="예: 3">
+      </div>
+      <div class="quick-row">
+        <button class="btn" data-action="buy-quick" data-amt="1">+$1</button>
+        <button class="btn" data-action="buy-quick" data-amt="2">+$2</button>
+        <button class="btn" data-action="buy-quick" data-amt="5">+$5</button>
+        <button class="btn" data-action="buy-quick" data-amt="10">+$10</button>
+      </div>
+      <h2 style="margin-top:18px">4. 비밀번호 (4자리)</h2>
+      <div class="field"><input type="password" id="buyPin" class="input" inputmode="numeric" maxlength="4" placeholder="••••"></div>
+      <button class="btn btn-primary" data-action="confirm-buy">매수 체결</button>
+    </div>` : ''}
+    <div id="buyReceiptSlot">${ui.buyReceipt||''}</div>
+  `;
+}
+
+/* ---------- SELL ---------- */
+function renderSell(){
+  const el = document.getElementById('tab-sell');
+  if(!S.market?.started){
+    el.innerHTML = `<div class="lock"><div class="disp">거래소 개장 전입니다</div>관리자가 게임을 시작하면 매도할 수 있어요.</div>`;
+    return;
+  }
+  const stu = S.students.find(s=>s.id===ui.sellStudent);
+  const held = stu ? STOCK_KEYS.filter(k=> (stu.holdings?.[k]?.units||0) > 0.0001) : [];
+  const stockKey = ui.sellStock && held.includes(ui.sellStock) ? ui.sellStock : null;
+  let curVal=0, invested=0;
+  if(stu && stockKey){
+    const h = stu.holdings[stockKey];
+    invested = h.invested;
+    curVal = holdingValue(h, S.market.stocks[stockKey].price);
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>1. 매도할 학생</h2>
+      <div class="field"><select id="sellStudentSel">${studentOptions(ui.sellStudent)}</select></div>
+    </div>
+    ${stu ? `
+    <div class="card">
+      <h2>2. 보유 종목</h2>
+      ${held.length? `<div class="stock-picker">
+        ${held.map(k=>{
+          const meta=STOCK_META[k], h=stu.holdings[k];
+          const v = holdingValue(h, S.market.stocks[k].price);
+          const pnl = v - h.invested;
+          const pnlPct = h.invested? pnl/h.invested*100 : 0;
+          return `<button class="pick-card ${k===stockKey?'selected':''}" data-action="pick-sell-stock" data-stock="${k}">
+            <div class="stock-name" style="color:${meta.color}">${meta.name}</div>
+            <div class="pc-price num">${fmtMoney(v)}</div>
+            <div class="pc-pnl num ${pctClass(pnl)}-text">${fmtMoney(pnl)} (${fmtPct(pnlPct)})</div>
+          </button>`;
+        }).join('')}
+      </div>` : `<div class="empty">${stu.name}님은 보유 중인 종목이 없어요.</div>`}
+    </div>` : ''}
+    ${stu && stockKey ? `
+    <div class="card">
+      <h2>3. 매도 금액 ($)</h2>
+      <div class="banner">평가금액 <b class="num">${fmtMoney(curVal)}</b> · 매입금액 <b class="num">${fmtMoney(invested)}</b></div>
+      <div class="field" style="margin-top:12px"><input type="number" id="sellAmount" class="input" min="0.01" step="0.01" placeholder="매도할 금액"></div>
+      <div class="quick-row">
+        <button class="btn" data-action="sell-quick" data-frac="0.25">1/4 매도</button>
+        <button class="btn" data-action="sell-quick" data-frac="0.5">1/2 매도</button>
+        <button class="btn" data-action="sell-quick" data-frac="1">전량매도</button>
+      </div>
+      <h2 style="margin-top:18px">4. 비밀번호 (4자리)</h2>
+      <div class="field"><input type="password" id="sellPin" class="input" inputmode="numeric" maxlength="4" placeholder="••••"></div>
+      <button class="btn btn-primary" data-action="confirm-sell">매도 체결</button>
+    </div>` : ''}
+    <div id="sellReceiptSlot">${ui.sellReceipt||''}</div>
+  `;
+}
+
+/* ---------- ACCOUNT ---------- */
+async function loadAcctTrades(sid){
+  if(!db || !sid){ ui.acctTrades=[]; renderAccount(); return; }
+  try{
+    const snap = await db.collection('trades').where('studentId','==',sid).orderBy('ts','desc').limit(15).get();
+    ui.acctTrades = snap.docs.map(d=>d.data());
+  }catch(e){ ui.acctTrades=[]; }
+  renderAccount();
+}
+
+function renderAccount(){
+  const el = document.getElementById('tab-account');
+  const stu = S.students.find(s=>s.id===ui.acctStudent);
+  el.innerHTML = `
+    <div class="card">
+      <h2>학생 선택</h2>
+      <div class="field"><select id="acctStudentSel">${studentOptions(ui.acctStudent)}</select></div>
+    </div>
+    ${!stu ? '' : (() => {
+      if(!S.market?.started){
+        return `<div class="lock"><div class="disp">${stu.name}님의 계좌</div>거래소 개장 전에는 자산 정보가 없어요.</div>`;
+      }
+      const assets = studentAssets(stu);
+      const ret = studentReturnPct(stu, assets);
+      const rows = STOCK_KEYS.filter(k=>(stu.holdings?.[k]?.units||0)>0.0001).map(k=>{
+        const meta=STOCK_META[k], h=stu.holdings[k];
+        const v = holdingValue(h, S.market.stocks[k].price);
+        const pnl = v-h.invested, pnlPct = h.invested? pnl/h.invested*100:0;
+        return `<tr><td style="color:${meta.color}">${meta.name}</td><td class="num">${fmtMoney(h.invested)}</td><td class="num">${fmtMoney(v)}</td><td class="num ${pctClass(pnl)}-text">${fmtMoney(pnl)} (${fmtPct(pnlPct)})</td></tr>`;
+      }).join('');
+      const tradeLabel = {buy:'매수', sell:'매도'};
+      const histRows = ui.acctTrades.length ? ui.acctTrades.map(t=>`
+        <div class="trade-row"><span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.stockKey?(STOCK_META[t.stockKey]?.name||t.stockKey)+' · ':''}${t.date}</span><span class="num">${fmtMoney(t.amount)}</span></div>
+      `).join('') : `<div class="empty">거래 내역이 없어요.</div>`;
+      return `
+      <div class="card">
+        <h2>${stu.name}님의 계좌</h2>
+        <div class="stat-row">
+          <div class="stat"><div class="label">평가금액</div><div class="value num">${fmtMoney(assets)}</div></div>
+          <div class="stat"><div class="label">누적 수익률</div><div class="value num ${pctClass(ret)}-text">${fmtPct(ret)}</div></div>
+          <div class="stat"><div class="label">누적 매수금액</div><div class="value num">${fmtMoney(stu.totalBought||0)}</div></div>
+          <div class="stat"><div class="label">누적 매도금액</div><div class="value num">${fmtMoney(stu.totalSold||0)}</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>보유 종목</h3>
+        ${rows ? `<div class="tbl-wrap"><table><thead><tr><th>종목</th><th>매입금액</th><th>평가금액</th><th>손익</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">보유 중인 종목이 없어요.</div>`}
+      </div>
+      <div class="card">
+        <h3>최근 거래 내역</h3>
+        ${histRows}
+      </div>
+      <div class="card">
+        <h3>비밀번호 변경</h3>
+        <div class="field"><label>현재 비밀번호</label><input type="password" id="acctOldPin" class="input" inputmode="numeric" maxlength="4"></div>
+        <div class="field"><label>새 비밀번호</label><input type="password" id="acctNewPin1" class="input" inputmode="numeric" maxlength="4"></div>
+        <div class="field"><label>새 비밀번호 확인</label><input type="password" id="acctNewPin2" class="input" inputmode="numeric" maxlength="4"></div>
+        <button class="btn" data-action="acct-change-pin">비밀번호 변경</button>
+      </div>`;
+    })()}
+  `;
+}
+
+/* ---------- RANKING ---------- */
+function renderRanking(){
+  const el = document.getElementById('tab-ranking');
+  if(!S.market?.started){
+    el.innerHTML = `<div class="lock"><div class="disp">거래소 개장 전입니다</div>게임이 시작되면 랭킹이 표시돼요.</div>`;
+    return;
+  }
+  const rows = [...S.students].map(s=>{
+    const assets = studentAssets(s);
+    const ret = studentReturnPct(s, assets);
+    return { ...s, assets, ret };
+  }).sort((a,b)=> ui.rankSort==='assets' ? b.assets-a.assets : b.ret-a.ret);
+  const medals=['🥇','🥈','🥉'];
+  el.innerHTML = `
+    <div class="card">
+      <div class="sort-row">
+        <button class="btn ${ui.rankSort==='assets'?'active':''}" data-action="rank-sort" data-sort="assets">평가금액순</button>
+        <button class="btn ${ui.rankSort==='return'?'active':''}" data-action="rank-sort" data-sort="return">수익률순</button>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>순위</th><th>이름</th><th>평가금액</th><th>수익률</th></tr></thead><tbody>
+        ${rows.map((s,i)=>`<tr><td>${medals[i]||(i+1)}</td><td>${s.name}</td><td class="num">${fmtMoney(s.assets)}</td><td class="num ${pctClass(s.ret)}-text">${fmtPct(s.ret)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+  `;
+}
+
+/* ---------- ADMIN ---------- */
+function renderAdmin(){
+  const el = document.getElementById('tab-admin');
+  if(!ui.adminUnlocked){
+    el.innerHTML = `
+      <div class="card" style="max-width:360px">
+        <h2>관리자 인증</h2>
+        <p class="muted" style="font-size:13px">증권거래소 담당 학생 또는 선생님만 입력해 주세요.</p>
+        <div class="pin-row">
+          <input type="password" id="adminPinInput" class="input" inputmode="numeric" maxlength="4" placeholder="관리자 비밀번호">
+          <button class="btn btn-primary" style="width:auto" data-action="admin-unlock">확인</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if(S.students.length===0 && !S.market){
+    el.innerHTML = `
+      <div class="card">
+        <h2>최초 설정</h2>
+        <p class="muted" style="font-size:13px">아직 Firebase 데이터베이스가 비어 있어요. 아래 버튼을 한 번만 눌러서 학생 27명 명단과 초기 시세를 만들어 주세요.</p>
+        <button class="btn btn-primary" data-action="admin-seed-data">초기 데이터 만들기</button>
+      </div>`;
+    return;
+  }
+  if(!S.market || !S.adminConfig){
+    el.innerHTML = `<div class="lock"><div class="disp">불러오는 중…</div></div>`;
+    return;
+  }
+  const m = S.market;
+  const historyRows = (m.history||[]).slice().reverse().map(h=>`
+    <tr><td>${h.date}</td>
+      <td class="num ${pctClass(h.hynixPct)}-text">${fmtPct(h.hynixPct)}</td>
+      <td class="num ${pctClass(h.alphabetPct)}-text">${fmtPct(h.alphabetPct)}</td>
+      <td class="num ${pctClass(h.sp500Pct)}-text">${fmtPct(h.sp500Pct)}</td>
+    </tr>`).join('');
+  const currentRows = STOCK_KEYS.map(k=>{
+    const st = m.stocks[k];
+    const chg = st.prevClose ? (st.price-st.prevClose)/st.prevClose*100 : 0;
+    return `<tr><td style="color:${STOCK_META[k].color}">${STOCK_META[k].name}</td><td class="num">${fmtMoney(st.price)}</td><td class="num ${pctClass(chg)}-text">${fmtPct(chg)}</td></tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>현재 시세</h2>
+      <div class="tbl-wrap"><table><thead><tr><th>종목</th><th>현재가</th><th>전일대비</th></tr></thead><tbody>${currentRows}</tbody></table></div>
+    </div>
+
+    ${!m.started ? `
+    <div class="card">
+      <h2>거래소 개장</h2>
+      <p class="muted" style="font-size:13px">학생들은 실물 화폐로 직접 결제하고, 이 사이트에서는 매수·매도 탭에서 몇 달러를 어떤 종목에 사고팔았는지만 기록해요.</p>
+      <button class="btn btn-primary" data-action="admin-start-game">게임 시작</button>
+    </div>` : `<div class="banner">✅ ${m.startDate} 에 개장하여 진행 중입니다.</div>`}
+
+    <div class="card">
+      <h2>오늘의 전일대비 등락률 입력</h2>
+      <div class="field"><label>날짜</label><input type="date" id="rateDate" class="input" value="${todayStr()}"></div>
+      <div class="stock-picker">
+        ${STOCK_KEYS.map(k=>`
+          <div class="field"><label style="color:${STOCK_META[k].color}">${STOCK_META[k].name} 등락률 (%)</label>
+          <input type="number" step="0.1" class="input rate-input" data-stock="${k}" placeholder="예: 1.5 또는 -2.3"></div>
+        `).join('')}
+      </div>
+      <button class="btn btn-primary" data-action="admin-apply-rates" ${m.started?'':'disabled'}>시세 반영</button>
+      ${!m.started ? `<p class="muted" style="font-size:12px">게임을 먼저 시작해야 시세를 반영할 수 있어요.</p>` : ''}
+    </div>
+
+    <div class="card">
+      <h3>시세 입력 기록</h3>
+      ${historyRows ? `<div class="tbl-wrap"><table><thead><tr><th>날짜</th><th>${STOCK_META.hynix.name}</th><th>${STOCK_META.alphabet.name}</th><th>${STOCK_META.sp500.name}</th></tr></thead><tbody>${historyRows}</tbody></table></div>` : `<div class="empty">아직 입력된 기록이 없어요.</div>`}
+    </div>
+
+    <div class="card" style="max-width:360px">
+      <h3>관리자 비밀번호 변경</h3>
+      <div class="field"><input type="password" id="adminNewPin1" class="input" inputmode="numeric" maxlength="4" placeholder="새 비밀번호"></div>
+      <div class="field"><input type="password" id="adminNewPin2" class="input" inputmode="numeric" maxlength="4" placeholder="새 비밀번호 확인"></div>
+      <button class="btn" data-action="admin-change-pin">변경</button>
+    </div>
+
+    <div class="danger-zone">
+      <h3>게임 초기화</h3>
+      <p class="muted" style="font-size:13px">모든 학생의 보유종목·거래내역과 시세 기록이 삭제됩니다. 되돌릴 수 없어요.</p>
+      <div class="field" style="max-width:280px"><input type="text" id="resetConfirmInput" class="input" placeholder="&quot;초기화&quot; 입력"></div>
+      <button class="btn btn-danger" data-action="admin-reset-game">전체 초기화</button>
+    </div>
+  `;
+}
+
+/* ---------- EVENT DELEGATION ---------- */
+document.addEventListener('change', e=>{
+  if(e.target.id==='buyStudentSel'){ ui.buyStudent=e.target.value||null; ui.buyStock=null; ui.buyReceipt=null; renderBuy(); }
+  if(e.target.id==='sellStudentSel'){ ui.sellStudent=e.target.value||null; ui.sellStock=null; ui.sellReceipt=null; renderSell(); }
+  if(e.target.id==='acctStudentSel'){ ui.acctStudent=e.target.value||null; loadAcctTrades(ui.acctStudent); }
+});
+
+document.addEventListener('click', async e=>{
+  const t = e.target.closest('[data-action]'); if(!t) return;
+  const action = t.dataset.action;
+
+  if(action==='toggle-info'){ ui.openInfo = ui.openInfo===t.dataset.stock ? null : t.dataset.stock; renderHome(); }
+  if(action==='pick-buy-stock'){ ui.buyStock=t.dataset.stock; ui.buyReceipt=null; renderBuy(); }
+  if(action==='pick-sell-stock'){ ui.sellStock=t.dataset.stock; ui.sellReceipt=null; renderSell(); }
+
+  if(action==='buy-quick'){
+    const inp = document.getElementById('buyAmount');
+    if(!inp) return;
+    inp.value = round2((parseFloat(inp.value)||0) + parseFloat(t.dataset.amt)).toFixed(2);
+  }
+  if(action==='sell-quick'){
+    const stu = S.students.find(s=>s.id===ui.sellStudent);
+    const inp = document.getElementById('sellAmount');
+    if(!stu||!ui.sellStock||!inp) return;
+    const v = holdingValue(stu.holdings[ui.sellStock], S.market.stocks[ui.sellStock].price);
+    inp.value = round2(v * parseFloat(t.dataset.frac)).toFixed(2);
+  }
+
+  if(action==='confirm-buy') await doBuy();
+  if(action==='confirm-sell') await doSell();
+  if(action==='acct-change-pin') await doAcctChangePin();
+
+  if(action==='admin-unlock'){
+    const pin = document.getElementById('adminPinInput').value;
+    if(pin === (S.adminConfig?.pin||'1234')){
+      ui.adminUnlocked=true; sessionStorage.setItem('adminUnlocked','1'); renderAdmin();
+    } else toast('비밀번호가 올바르지 않아요.', true);
+  }
+  if(action==='admin-seed-data') await doSeedInitialData();
+  if(action==='admin-start-game') await doStartGame();
+  if(action==='admin-apply-rates') await doApplyRates();
+  if(action==='admin-change-pin') await doAdminChangePin();
+  if(action==='admin-reset-game') await doResetGame();
+});
+
+/* ---------- ACTIONS ---------- */
+async function doBuy(){
+  if(!db) return toast('데이터 연결이 없어요.', true);
+  const stu = S.students.find(s=>s.id===ui.buyStudent);
+  const stockKey = ui.buyStock;
+  const amtInput = document.getElementById('buyAmount');
+  const pinInput = document.getElementById('buyPin');
+  if(!stu||!stockKey||!amtInput||!pinInput) return;
+  const amount = round2(parseFloat(amtInput.value));
+  if(!amount || amount<=0) return toast('매수 금액을 입력해 주세요.', true);
+  if(pinInput.value !== stu.pin) return toast('비밀번호가 올바르지 않아요.', true);
+
+  const price = S.market.stocks[stockKey].price;
+  const units = amount/price;
+  const holdings = JSON.parse(JSON.stringify(stu.holdings));
+  holdings[stockKey].units += units;
+  holdings[stockKey].invested = round2(holdings[stockKey].invested + amount);
+  const totalBought = round2((stu.totalBought||0) + amount);
+
+  try{
+    await db.doc('students/'+stu.id).update({ holdings, totalBought });
+    await db.collection('trades').add({
+      studentId:stu.id, studentName:stu.name, stockKey, type:'buy',
+      amount, price, ts:Date.now(), date:todayStr()
+    });
+    ui.buyReceipt = `
+      <div class="receipt">
+        <h3>📜 매수 체결 확인증</h3>
+        <div class="receipt-row"><span>거래일자</span><b>${todayStr()}</b></div>
+        <div class="receipt-row"><span>학생</span><b>${stu.name}</b></div>
+        <div class="receipt-row"><span>종목</span><b>${STOCK_META[stockKey].name}</b></div>
+        <div class="receipt-row"><span>매수금액</span><b class="num">${fmtMoney(amount)}</b></div>
+        <div class="receipt-row"><span>체결단가</span><b class="num">${fmtPrice(price)}</b></div>
+      </div>`;
+    renderBuy();
+    toast('매수가 체결되었어요.');
+  }catch(err){ console.error(err); toast('매수 처리 중 오류가 발생했어요.', true); }
+}
+
+async function doSell(){
+  if(!db) return toast('데이터 연결이 없어요.', true);
+  const stu = S.students.find(s=>s.id===ui.sellStudent);
+  const stockKey = ui.sellStock;
+  const amtInput = document.getElementById('sellAmount');
+  const pinInput = document.getElementById('sellPin');
+  if(!stu||!stockKey||!amtInput||!pinInput) return;
+  const h = stu.holdings[stockKey];
+  const price = S.market.stocks[stockKey].price;
+  const curVal = holdingValue(h, price);
+  const amount = round2(parseFloat(amtInput.value));
+  if(!amount || amount<=0) return toast('매도 금액을 입력해 주세요.', true);
+  if(amount > curVal+0.01) return toast('보유 평가금액보다 많이 매도할 수 없어요.', true);
+  if(pinInput.value !== stu.pin) return toast('비밀번호가 올바르지 않아요.', true);
+
+  const unitsToSell = amount/price;
+  const costRemoved = h.units>0 ? h.invested*(unitsToSell/h.units) : 0;
+  const pnl = round2(amount - costRemoved);
+  const holdings = JSON.parse(JSON.stringify(stu.holdings));
+  holdings[stockKey].units = Math.max(0, h.units-unitsToSell);
+  holdings[stockKey].invested = round2(Math.max(0, h.invested-costRemoved));
+  const totalSold = round2((stu.totalSold||0) + amount);
+
+  try{
+    await db.doc('students/'+stu.id).update({ holdings, totalSold });
+    await db.collection('trades').add({
+      studentId:stu.id, studentName:stu.name, stockKey, type:'sell',
+      amount, price, pnl, ts:Date.now(), date:todayStr()
+    });
+    ui.sellReceipt = `
+      <div class="receipt">
+        <h3>📜 매도 체결 확인증</h3>
+        <div class="receipt-row"><span>거래일자</span><b>${todayStr()}</b></div>
+        <div class="receipt-row"><span>학생</span><b>${stu.name}</b></div>
+        <div class="receipt-row"><span>종목</span><b>${STOCK_META[stockKey].name}</b></div>
+        <div class="receipt-row"><span>매도금액</span><b class="num">${fmtMoney(amount)}</b></div>
+        <div class="receipt-row"><span>체결단가</span><b class="num">${fmtPrice(price)}</b></div>
+        <div class="receipt-row"><span>실현손익</span><b class="num">${fmtMoney(pnl)}</b></div>
+      </div>`;
+    renderSell();
+    toast('매도가 체결되었어요.');
+  }catch(err){ console.error(err); toast('매도 처리 중 오류가 발생했어요.', true); }
+}
+
+async function doAcctChangePin(){
+  if(!db) return;
+  const stu = S.students.find(s=>s.id===ui.acctStudent);
+  const o=document.getElementById('acctOldPin'), n1=document.getElementById('acctNewPin1'), n2=document.getElementById('acctNewPin2');
+  if(!stu) return;
+  if(o.value!==stu.pin) return toast('현재 비밀번호가 올바르지 않아요.', true);
+  if(!/^\d{4}$/.test(n1.value)) return toast('새 비밀번호는 숫자 4자리로 입력해 주세요.', true);
+  if(n1.value!==n2.value) return toast('새 비밀번호가 서로 달라요.', true);
+  try{
+    await db.doc('students/'+stu.id).update({ pin:n1.value });
+    toast('비밀번호가 변경되었어요.');
+    o.value=n1.value=n2.value='';
+  }catch(err){ toast('변경 중 오류가 발생했어요.', true); }
+}
+
+const STUDENT_NAMES = [
+  '김로이','김시율','김태연','라유건','박수현','박지민','변지후','서건우','오준서','유동일',
+  '유채윤','은시현','이가빈','이나엘','이다인','이아연','이아인','이재원','이주연','장윤석',
+  '정연우','조연제','최지원','최하은','최현준','홍보나','홍순조'
+];
+
+async function doSeedInitialData(){
+  if(!db) return toast('데이터 연결이 없어요.', true);
+  try{
+    const batch = db.batch();
+    STUDENT_NAMES.forEach((name,i)=>{
+      const id = 's'+String(i+1).padStart(2,'0');
+      batch.set(db.collection('students').doc(id), {
+        name, pin:'1234', totalBought:0, totalSold:0,
+        holdings:{ hynix:{units:0,invested:0}, alphabet:{units:0,invested:0}, sp500:{units:0,invested:0} }
+      });
+    });
+    batch.set(db.doc('market/state'), {
+      started:false, startDate:null,
+      stocks:{
+        hynix:{name:'SK하이닉스', price:1, prevClose:1, newsToday:'', newsDate:''},
+        alphabet:{name:'알파벳', price:1, prevClose:1, newsToday:'', newsDate:''},
+        sp500:{name:'S&P500', price:1, prevClose:1, newsToday:'', newsDate:''}
+      },
+      history:[]
+    });
+    batch.set(db.doc('config/admin'), { pin:'1234' });
+    await batch.commit();
+    toast('초기 데이터가 만들어졌어요!');
+  }catch(err){ console.error(err); toast('초기 데이터 생성 중 오류가 발생했어요.', true); }
+}
+
+async function doStartGame(){
+  if(!db) return;
+  try{
+    await db.doc('market/state').update({ started:true, startDate:todayStr() });
+    toast('게임이 시작되었어요!');
+  }catch(err){ console.error(err); toast('시작 중 오류가 발생했어요.', true); }
+}
+
+async function doApplyRates(){
+  if(!db) return;
+  const date = document.getElementById('rateDate').value || todayStr();
+  if((S.market.history||[]).some(h=>h.date===date)) return toast('이미 입력된 날짜예요.', true);
+  const inputs = [...document.querySelectorAll('.rate-input')];
+  const rates = {};
+  for(const inp of inputs){
+    const v = parseFloat(inp.value);
+    if(isNaN(v)) return toast('세 종목의 등락률을 모두 입력해 주세요.', true);
+    rates[inp.dataset.stock] = v;
+  }
+  const newStocks = JSON.parse(JSON.stringify(S.market.stocks));
+  const entry = { date };
+  STOCK_KEYS.forEach(k=>{
+    const oldPrice = newStocks[k].price;
+    const newPrice = oldPrice * (1+rates[k]/100);
+    newStocks[k].prevClose = oldPrice;
+    newStocks[k].price = newPrice;
+    entry[k+'Pct'] = rates[k];
+    entry[k+'Price'] = newPrice;
+  });
+  const history = [...(S.market.history||[]), entry];
+  try{
+    await db.doc('market/state').update({ stocks:newStocks, history });
+    toast('오늘의 시세가 반영되었어요.');
+    document.querySelectorAll('.rate-input').forEach(i=>i.value='');
+  }catch(err){ console.error(err); toast('반영 중 오류가 발생했어요.', true); }
+}
+
+async function doAdminChangePin(){
+  if(!db) return;
+  const n1=document.getElementById('adminNewPin1'), n2=document.getElementById('adminNewPin2');
+  if(!/^\d{4}$/.test(n1.value)) return toast('숫자 4자리로 입력해 주세요.', true);
+  if(n1.value!==n2.value) return toast('비밀번호가 서로 달라요.', true);
+  try{
+    await db.doc('config/admin').update({ pin:n1.value });
+    toast('관리자 비밀번호가 변경되었어요.');
+    n1.value=n2.value='';
+  }catch(err){ toast('변경 중 오류가 발생했어요.', true); }
+}
+
+async function doResetGame(){
+  if(!db) return;
+  const conf = document.getElementById('resetConfirmInput').value;
+  if(conf!=='초기화') return toast('"초기화"를 정확히 입력해 주세요.', true);
+  try{
+    const resetStocks = {};
+    STOCK_KEYS.forEach(k=> resetStocks[k] = { name:STOCK_META[k].name, price:1, prevClose:1, newsToday:'', newsDate:'' });
+    await db.doc('market/state').update({ started:false, startDate:null, stocks:resetStocks, history:[] });
+    await Promise.all(S.students.map(s=> db.doc('students/'+s.id).update({
+      totalBought:0, totalSold:0, holdings:{ hynix:{units:0,invested:0}, alphabet:{units:0,invested:0}, sp500:{units:0,invested:0} }
+    })));
+    const tradeSnap = await db.collection('trades').limit(500).get();
+    await Promise.all(tradeSnap.docs.map(d=> db.doc('trades/'+d.id).delete()));
+    toast('게임이 초기화되었어요.');
+  }catch(err){ console.error(err); toast('초기화 중 오류가 발생했어요.', true); }
+}
+
+initDb();
+setInterval(()=>{ document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'}); }, 60000);
+</script>
+</body>
+</html>
