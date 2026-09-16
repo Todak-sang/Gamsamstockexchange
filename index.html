@@ -263,11 +263,13 @@ let ui = {
   sellStudent:null, sellStock:null,
   acctStudent:null,
   acctTrades:[],
+  acctTradeRange:'1w',
   buyReceipt:null, sellReceipt:null,
   openInfo:null,
   rankSort:'assets',
   chartRange:'1w',
-  adminUnlocked: sessionStorage.getItem('adminUnlocked')==='1'
+  adminUnlocked: sessionStorage.getItem('adminUnlocked')==='1',
+  correctionStudent:null, correctionTrades:[], pendingDeleteTradeId:null
 };
 
 function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
@@ -275,6 +277,13 @@ function fmtMoney(n){ const v=round2(n||0); const s=v<0?'-':''; return s+'$'+Mat
 function fmtPct(n){ if(!isFinite(n)) n=0; const s=n>0?'+':''; return s+n.toFixed(2)+'%'; }
 function fmtPrice(n){ return fmtMoney(n); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDateTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const mm = d.getMonth()+1, dd = d.getDate();
+  const hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
+  return `${mm}/${dd} ${hh}:${mi}`;
+}
 function pctClass(n){ return n>0.0001?'up':(n<-0.0001?'down':'flat'); }
 
 function toast(msg, isErr){
@@ -453,7 +462,7 @@ function renderHome(){
   const tradeLabel = {buy:'매수', sell:'매도'};
   const tradesHtml = S.recentTrades.length ? S.recentTrades.slice(0,8).map(t=>`
     <div class="trade-row">
-      <span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.studentName}${t.stockKey?` · ${STOCK_META[t.stockKey]?.name||t.stockKey}`:''}</span>
+      <span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.studentName}${t.stockKey?` · ${STOCK_META[t.stockKey]?.name||t.stockKey}`:''}<br><span class="muted" style="font-size:11px">${fmtDateTime(t.ts)}</span></span>
       <span class="num">${fmtMoney(t.amount)}</span>
     </div>`).join('') : `<div class="empty">아직 체결 내역이 없어요.</div>`;
 
@@ -591,9 +600,9 @@ function renderSell(){
 async function loadAcctTrades(sid){
   if(!db || !sid){ ui.acctTrades=[]; renderAccount(); return; }
   try{
-    const snap = await db.collection('trades').where('studentId','==',sid).orderBy('ts','desc').limit(15).get();
-    ui.acctTrades = snap.docs.map(d=>d.data());
-  }catch(e){ ui.acctTrades=[]; }
+    const snap = await db.collection('trades').where('studentId','==',sid).get();
+    ui.acctTrades = snap.docs.map(d=>d.data()).sort((a,b)=>b.ts-a.ts);
+  }catch(e){ console.error(e); ui.acctTrades=[]; }
   renderAccount();
 }
 
@@ -618,9 +627,11 @@ function renderAccount(){
         return `<tr><td style="color:${meta.color}">${meta.name}</td><td class="num">${fmtMoney(h.invested)}</td><td class="num">${fmtMoney(v)}</td><td class="num ${pctClass(pnl)}-text">${fmtMoney(pnl)} (${fmtPct(pnlPct)})</td></tr>`;
       }).join('');
       const tradeLabel = {buy:'매수', sell:'매도'};
-      const histRows = ui.acctTrades.length ? ui.acctTrades.map(t=>`
-        <div class="trade-row"><span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.stockKey?(STOCK_META[t.stockKey]?.name||t.stockKey)+' · ':''}${t.date}</span><span class="num">${fmtMoney(t.amount)}</span></div>
-      `).join('') : `<div class="empty">거래 내역이 없어요.</div>`;
+      const rangeCutoff = Date.now() - (ui.acctTradeRange==='1w'?7:30)*86400000;
+      const rangedTrades = ui.acctTrades.filter(t=>t.ts>=rangeCutoff);
+      const histRows = rangedTrades.length ? rangedTrades.map(t=>`
+        <div class="trade-row"><span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${t.stockKey?(STOCK_META[t.stockKey]?.name||t.stockKey)+' · ':''}${fmtDateTime(t.ts)}</span><span class="num">${fmtMoney(t.amount)}</span></div>
+      `).join('') : `<div class="empty">해당 기간에 거래 내역이 없어요.</div>`;
       return `
       <div class="card">
         <h2>${stu.name}님의 계좌</h2>
@@ -637,14 +648,11 @@ function renderAccount(){
       </div>
       <div class="card">
         <h3>최근 거래 내역</h3>
+        <div class="sort-row">
+          <button class="btn ${ui.acctTradeRange==='1w'?'active':''}" data-action="acct-trade-range" data-range="1w">최근 1주</button>
+          <button class="btn ${ui.acctTradeRange==='1m'?'active':''}" data-action="acct-trade-range" data-range="1m">최근 1개월</button>
+        </div>
         ${histRows}
-      </div>
-      <div class="card">
-        <h3>비밀번호 변경</h3>
-        <div class="field"><label>현재 비밀번호</label><input type="password" id="acctOldPin" class="input" inputmode="numeric" maxlength="4"></div>
-        <div class="field"><label>새 비밀번호</label><input type="password" id="acctNewPin1" class="input" inputmode="numeric" maxlength="4"></div>
-        <div class="field"><label>새 비밀번호 확인</label><input type="password" id="acctNewPin2" class="input" inputmode="numeric" maxlength="4"></div>
-        <button class="btn" data-action="acct-change-pin">비밀번호 변경</button>
       </div>`;
     })()}
   `;
@@ -677,6 +685,64 @@ function renderRanking(){
 }
 
 /* ---------- ADMIN ---------- */
+function renderCorrectionTradesList(){
+  if(!ui.correctionStudent) return '';
+  if(!ui.correctionTrades.length) return `<div class="empty">거래 내역이 없어요.</div>`;
+  const tradeLabel = {buy:'매수', sell:'매도'};
+  return ui.correctionTrades.map(t=>{
+    const pending = ui.pendingDeleteTradeId===t.id;
+    return `<div class="trade-row">
+      <span><span class="trade-tag ${t.type}">${tradeLabel[t.type]||t.type}</span> ${STOCK_META[t.stockKey]?.name||t.stockKey} · <span class="num">${fmtMoney(t.amount)}</span><br><span class="muted" style="font-size:11px">${fmtDateTime(t.ts)}</span></span>
+      ${pending
+        ? `<button class="btn btn-danger" data-action="confirm-delete-trade" data-id="${t.id}" data-student="${ui.correctionStudent}">정말 삭제?</button>`
+        : `<button class="btn" data-action="delete-trade" data-id="${t.id}">삭제</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function loadCorrectionTrades(sid){
+  if(!db || !sid){ ui.correctionTrades=[]; renderAdmin(); return; }
+  try{
+    const snap = await db.collection('trades').where('studentId','==',sid).get();
+    ui.correctionTrades = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>b.ts-a.ts).slice(0,50);
+  }catch(e){ console.error(e); ui.correctionTrades=[]; }
+  renderAdmin();
+}
+
+async function recomputeStudentFromTrades(sid){
+  const snap = await db.collection('trades').where('studentId','==',sid).get();
+  const holdings = { hynix:{units:0,invested:0}, alphabet:{units:0,invested:0}, sp500:{units:0,invested:0} };
+  let totalBought=0, totalSold=0;
+  const sortedDocs = snap.docs.map(d=>d.data()).sort((a,b)=>a.ts-b.ts);
+  sortedDocs.forEach(t=>{
+    const h = holdings[t.stockKey];
+    if(!h) return;
+    if(t.type==='buy'){
+      h.units += t.amount/t.price;
+      h.invested = round2(h.invested + t.amount);
+      totalBought = round2(totalBought + t.amount);
+    } else if(t.type==='sell'){
+      const unitsToSell = t.amount/t.price;
+      const costRemoved = t.amount - (t.pnl||0);
+      h.units = Math.max(0, h.units - unitsToSell);
+      h.invested = round2(Math.max(0, h.invested - costRemoved));
+      totalSold = round2(totalSold + t.amount);
+    }
+  });
+  await db.doc('students/'+sid).update({ holdings, totalBought, totalSold });
+}
+
+async function doDeleteTrade(tradeId, sid){
+  if(!db) return;
+  try{
+    await db.doc('trades/'+tradeId).delete();
+    await recomputeStudentFromTrades(sid);
+    ui.pendingDeleteTradeId=null;
+    await loadCorrectionTrades(sid);
+    toast('거래를 삭제하고 계좌를 다시 계산했어요.');
+  }catch(err){ console.error(err); toast('삭제 중 오류가 발생했어요.', true); }
+}
+
 function renderAdmin(){
   const el = document.getElementById('tab-admin');
   if(!ui.adminUnlocked){
@@ -755,6 +821,13 @@ function renderAdmin(){
       <button class="btn" data-action="admin-change-pin">변경</button>
     </div>
 
+    <div class="card">
+      <h3>거래 내역 수정 (오류 정정)</h3>
+      <p class="muted" style="font-size:13px">잘못 기록된 거래를 찾아서 삭제하면, 그 학생의 보유종목·누적 매수/매도 금액이 남은 거래 기록만으로 자동으로 다시 계산돼요.</p>
+      <div class="field"><select id="correctionStudentSel">${studentOptions(ui.correctionStudent)}</select></div>
+      <div id="correctionTradesList">${renderCorrectionTradesList()}</div>
+    </div>
+
     <div class="danger-zone">
       <h3>게임 초기화</h3>
       <p class="muted" style="font-size:13px">모든 학생의 보유종목·거래내역과 시세 기록이 삭제됩니다. 되돌릴 수 없어요.</p>
@@ -769,6 +842,7 @@ document.addEventListener('change', e=>{
   if(e.target.id==='buyStudentSel'){ ui.buyStudent=e.target.value||null; ui.buyStock=null; ui.buyReceipt=null; renderBuy(); }
   if(e.target.id==='sellStudentSel'){ ui.sellStudent=e.target.value||null; ui.sellStock=null; ui.sellReceipt=null; renderSell(); }
   if(e.target.id==='acctStudentSel'){ ui.acctStudent=e.target.value||null; loadAcctTrades(ui.acctStudent); }
+  if(e.target.id==='correctionStudentSel'){ ui.correctionStudent=e.target.value||null; ui.pendingDeleteTradeId=null; loadCorrectionTrades(ui.correctionStudent); }
 });
 
 document.addEventListener('click', async e=>{
@@ -795,7 +869,8 @@ document.addEventListener('click', async e=>{
 
   if(action==='confirm-buy') await doBuy();
   if(action==='confirm-sell') await doSell();
-  if(action==='acct-change-pin') await doAcctChangePin();
+  if(action==='acct-trade-range'){ ui.acctTradeRange = t.dataset.range; renderAccount(); }
+  if(action==='rank-sort'){ ui.rankSort = t.dataset.sort; renderRanking(); }
 
   if(action==='admin-unlock'){
     const pin = document.getElementById('adminPinInput').value;
@@ -808,6 +883,8 @@ document.addEventListener('click', async e=>{
   if(action==='admin-apply-rates') await doApplyRates();
   if(action==='admin-change-pin') await doAdminChangePin();
   if(action==='admin-reset-game') await doResetGame();
+  if(action==='delete-trade'){ ui.pendingDeleteTradeId=t.dataset.id; renderAdmin(); }
+  if(action==='confirm-delete-trade') await doDeleteTrade(t.dataset.id, t.dataset.student);
 });
 
 /* ---------- ACTIONS ---------- */
@@ -838,7 +915,7 @@ async function doBuy(){
     ui.buyReceipt = `
       <div class="receipt">
         <h3>📜 매수 체결 확인증</h3>
-        <div class="receipt-row"><span>거래일자</span><b>${todayStr()}</b></div>
+        <div class="receipt-row"><span>거래일시</span><b>${fmtDateTime(Date.now())}</b></div>
         <div class="receipt-row"><span>학생</span><b>${stu.name}</b></div>
         <div class="receipt-row"><span>종목</span><b>${STOCK_META[stockKey].name}</b></div>
         <div class="receipt-row"><span>매수금액</span><b class="num">${fmtMoney(amount)}</b></div>
@@ -881,7 +958,7 @@ async function doSell(){
     ui.sellReceipt = `
       <div class="receipt">
         <h3>📜 매도 체결 확인증</h3>
-        <div class="receipt-row"><span>거래일자</span><b>${todayStr()}</b></div>
+        <div class="receipt-row"><span>거래일시</span><b>${fmtDateTime(Date.now())}</b></div>
         <div class="receipt-row"><span>학생</span><b>${stu.name}</b></div>
         <div class="receipt-row"><span>종목</span><b>${STOCK_META[stockKey].name}</b></div>
         <div class="receipt-row"><span>매도금액</span><b class="num">${fmtMoney(amount)}</b></div>
@@ -891,21 +968,6 @@ async function doSell(){
     renderSell();
     toast('매도가 체결되었어요.');
   }catch(err){ console.error(err); toast('매도 처리 중 오류가 발생했어요.', true); }
-}
-
-async function doAcctChangePin(){
-  if(!db) return;
-  const stu = S.students.find(s=>s.id===ui.acctStudent);
-  const o=document.getElementById('acctOldPin'), n1=document.getElementById('acctNewPin1'), n2=document.getElementById('acctNewPin2');
-  if(!stu) return;
-  if(o.value!==stu.pin) return toast('현재 비밀번호가 올바르지 않아요.', true);
-  if(!/^\d{4}$/.test(n1.value)) return toast('새 비밀번호는 숫자 4자리로 입력해 주세요.', true);
-  if(n1.value!==n2.value) return toast('새 비밀번호가 서로 달라요.', true);
-  try{
-    await db.doc('students/'+stu.id).update({ pin:n1.value });
-    toast('비밀번호가 변경되었어요.');
-    o.value=n1.value=n2.value='';
-  }catch(err){ toast('변경 중 오류가 발생했어요.', true); }
 }
 
 const STUDENT_NAMES = [
