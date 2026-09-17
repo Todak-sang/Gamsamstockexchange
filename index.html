@@ -83,9 +83,11 @@ main{padding-top:22px;}
 .info-btn:hover{border-color:var(--accent);color:var(--accent);}
 .stock-info{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:13px;color:var(--muted);}
 .stock-info p{margin:0 0 8px;}
-.news-line{font-size:12.5px;color:var(--ink);background:var(--surface-2);border-radius:8px;padding:8px 10px;}
+.news-line{font-size:12.5px;color:var(--ink);background:var(--surface-2);border-radius:8px;padding:8px 10px;margin-top:10px;}
 .news-line.muted{color:var(--muted);}
 .news-line b{font-family:'JetBrains Mono',monospace;font-weight:600;margin-right:4px;}
+.news-line a{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}
+.news-line a:hover{color:var(--accent);}
 .stock-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
 .stock-icon svg{width:100%;height:100%;display:block;}
 .stock-name{font-family:'Gowun Batang',serif;font-weight:700;font-size:15px;}
@@ -454,8 +456,8 @@ function renderHome(){
       ${detailChart(priceSeries(k, ui.chartRange==='1w'?7:30))}
       <div class="stock-info" ${open?'':'hidden'}>
         <p>${STOCK_INFO[k]}</p>
-        ${st.newsToday ? `<div class="news-line">📰 <b>${st.newsDate||''}</b>${st.newsToday}</div>` : `<div class="news-line muted">아직 등록된 오늘의 뉴스가 없어요.</div>`}
       </div>
+      ${st.newsToday ? `<div class="news-line">📰 <b>${st.newsDate||''}</b> ${st.newsUrl ? `<a href="${st.newsUrl}" target="_blank" rel="noopener noreferrer">${st.newsToday}</a>` : st.newsToday}</div>` : `<div class="news-line muted">아직 등록된 오늘의 뉴스가 없어요.</div>`}
     </div>`;
   }).join('');
 
@@ -582,7 +584,8 @@ function renderSell(){
     <div class="card">
       <h2>3. 매도 금액 ($)</h2>
       <div class="banner">평가금액 <b class="num">${fmtMoney(curVal)}</b> · 매입금액 <b class="num">${fmtMoney(invested)}</b></div>
-      <div class="field" style="margin-top:12px"><input type="number" id="sellAmount" class="input" min="0.01" step="0.01" placeholder="매도할 금액"></div>
+      <div class="field" style="margin-top:12px"><input type="number" id="sellAmount" class="input" min="1" max="${Math.max(0,Math.floor(curVal))}" step="1" placeholder="매도할 금액 (1달러 단위)"></div>
+      <p class="muted" style="font-size:12px;margin:4px 0 0">평가금액을 넘는 금액은 매도할 수 없고, 전량매도가 아니면 1달러 단위로만 매도할 수 있어요.</p>
       <div class="quick-row">
         <button class="btn" data-action="sell-quick" data-frac="0.25">1/4 매도</button>
         <button class="btn" data-action="sell-quick" data-frac="0.5">1/2 매도</button>
@@ -803,6 +806,10 @@ function renderAdmin(){
         ${STOCK_KEYS.map(k=>`
           <div class="field"><label style="color:${STOCK_META[k].color}">${STOCK_META[k].name} 등락률 (%)</label>
           <input type="number" step="0.1" class="input rate-input" data-stock="${k}" placeholder="예: 1.5 또는 -2.3"></div>
+          <div class="field"><label style="color:${STOCK_META[k].color}">${STOCK_META[k].name} 오늘의 뉴스 (선택)</label>
+          <input type="text" class="input news-input" data-stock="${k}" placeholder="예: OO사와 대규모 공급계약 체결 소식" maxlength="80"></div>
+          <div class="field"><label style="color:${STOCK_META[k].color}">${STOCK_META[k].name} 뉴스 링크 (선택)</label>
+          <input type="url" class="input newsurl-input" data-stock="${k}" placeholder="https://..."></div>
         `).join('')}
       </div>
       <button class="btn btn-primary" data-action="admin-apply-rates" ${m.started?'':'disabled'}>시세 반영</button>
@@ -864,7 +871,8 @@ document.addEventListener('click', async e=>{
     const inp = document.getElementById('sellAmount');
     if(!stu||!ui.sellStock||!inp) return;
     const v = holdingValue(stu.holdings[ui.sellStock], S.market.stocks[ui.sellStock].price);
-    inp.value = round2(v * parseFloat(t.dataset.frac)).toFixed(2);
+    const frac = parseFloat(t.dataset.frac);
+    inp.value = frac>=1 ? round2(v).toFixed(2) : Math.floor(v*frac).toString();
   }
 
   if(action==='confirm-buy') await doBuy();
@@ -939,6 +947,8 @@ async function doSell(){
   const amount = round2(parseFloat(amtInput.value));
   if(!amount || amount<=0) return toast('매도 금액을 입력해 주세요.', true);
   if(amount > curVal+0.01) return toast('보유 평가금액보다 많이 매도할 수 없어요.', true);
+  const isFullSell = Math.abs(amount - curVal) < 0.01;
+  if(!isFullSell && !Number.isInteger(amount)) return toast('매도 금액은 1달러 단위로 입력해 주세요 (전량매도는 예외).', true);
   if(pinInput.value !== stu.pin) return toast('비밀번호가 올바르지 않아요.', true);
 
   const unitsToSell = amount/price;
@@ -1030,12 +1040,19 @@ async function doApplyRates(){
     newStocks[k].price = newPrice;
     entry[k+'Pct'] = rates[k];
     entry[k+'Price'] = newPrice;
+    const newsEl = document.querySelector(`.news-input[data-stock="${k}"]`);
+    const urlEl = document.querySelector(`.newsurl-input[data-stock="${k}"]`);
+    if(newsEl && newsEl.value.trim()){
+      newStocks[k].newsToday = newsEl.value.trim();
+      newStocks[k].newsDate = date;
+      newStocks[k].newsUrl = (urlEl && urlEl.value.trim()) || '';
+    }
   });
   const history = [...(S.market.history||[]), entry];
   try{
     await db.doc('market/state').update({ stocks:newStocks, history });
     toast('오늘의 시세가 반영되었어요.');
-    document.querySelectorAll('.rate-input').forEach(i=>i.value='');
+    document.querySelectorAll('.rate-input, .news-input, .newsurl-input').forEach(i=>i.value='');
   }catch(err){ console.error(err); toast('반영 중 오류가 발생했어요.', true); }
 }
 
