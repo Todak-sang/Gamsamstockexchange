@@ -94,6 +94,7 @@ main{padding-top:22px;}
 .stock-sub{font-size:11px;color:var(--muted);}
 .stock-price{font-size:26px;font-weight:600;margin-top:10px;}
 .stock-chg{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-top:2px;padding:2px 8px;border-radius:999px;}
+.chg-date{font-size:10.5px;font-weight:400;opacity:0.7;margin-left:2px;}
 .stock-chg.up{color:var(--up);background:color-mix(in srgb, var(--up) 14%, transparent);}
 .stock-chg.down{color:var(--down);background:color-mix(in srgb, var(--down) 14%, transparent);}
 .stock-chg.flat{color:var(--flat);background:color-mix(in srgb, var(--flat) 14%, transparent);}
@@ -286,6 +287,12 @@ function fmtDateTime(ts){
   const hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
   return `${mm}/${dd} ${hh}:${mi}`;
 }
+function fmtDateOnly(dateStr){
+  if(!dateStr) return '';
+  const parts = dateStr.split('-');
+  if(parts.length!==3) return dateStr;
+  return `${parseInt(parts[1],10)}/${parseInt(parts[2],10)}`;
+}
 function pctClass(n){ return n>0.0001?'up':(n<-0.0001?'down':'flat'); }
 
 function toast(msg, isErr){
@@ -452,7 +459,7 @@ function renderHome(){
         <button class="info-btn" data-action="toggle-info" data-stock="${k}" aria-label="${meta.name} 설명 보기" title="종목 설명 · 오늘의 뉴스">ⓘ</button>
       </div>
       <div class="stock-price num">${fmtPrice(st.price)}</div>
-      <div class="stock-chg ${cls} num">${arrow} ${fmtPct(chg)}</div>
+      <div class="stock-chg ${cls} num">${arrow} ${fmtPct(chg)} ${st.newsDate?`<span class="chg-date">(${fmtDateOnly(st.newsDate)} 기준)</span>`:''}</div>
       ${detailChart(priceSeries(k, ui.chartRange==='1w'?7:30))}
       <div class="stock-info" ${open?'':'hidden'}>
         <p>${STOCK_INFO[k]}</p>
